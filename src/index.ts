@@ -1,6 +1,7 @@
 import {format, differenceInMinutes, parse, isDate} from "date-fns";
-import {isNumber} from "lodash";
 
+
+const SPAN_CLASS = 'working-time';
 const calcWorkingMinutes = (hoursArray: Date[]) => {
     if (hoursArray.length <= 1) return 0;
     if (hoursArray.length < 4) {
@@ -14,10 +15,12 @@ const calcWorkingMinutes = (hoursArray: Date[]) => {
     return 0;
 }
 
-
-const appendSpan = (element: Element, minutes: number) => {
+const appendSpan = ({element, minutes, showOutTime = true}: {element: HTMLElement, minutes: number, showOutTime?: boolean}) => {
     if(isNaN(minutes)) return;
+    const existingSpan = element.querySelector('.working-time');
+    if (existingSpan !== null) element.removeChild(existingSpan);
     const span = document.createElement('span');
+    span.className = SPAN_CLASS;
     const shouldWorkMinutes = 8*60;
 
     const diff = minutes - shouldWorkMinutes;
@@ -27,15 +30,21 @@ const appendSpan = (element: Element, minutes: number) => {
     else span.style.color = 'green';
     span.style.fontWeight = 'bold';
     span.style.whiteSpace = 'pre-wrap'
+    span.style.width = '100%'
+    span.style.textAlign = 'left'
     const date = new Date((Math.abs(diff)-60) * 60 * 1000);
+    let outDate = new Date((Date.now() + (Math.abs(diff)*60*1000)))
+    let outMinutes = outDate.getMinutes() < 10 ? `0${outDate.getMinutes()}`: outDate.getMinutes()
+    let outString = diff < 0 ? ` (saída às ${outDate.getHours()}:${outMinutes})`: ''
     const formatted = format(date, 'HH:mm');
-    span.innerText = `   ${diff < 0 ? '-': '+'} ${formatted} ⌛   `;
+    span.innerText = `   ${diff < 0 ? '-': '+'} ${formatted} ${showOutTime ? outString : ""} ⌛`;
     element.appendChild(span);
 }
 
-const worker = () => {
+const setCurrentDay = () => {
     const currentDay = document.getElementById('ctl00_ASPxSplitter_cphContent_painelMovimentosAssiduidade_WMovimentosAssiduidade_cpMovimentosAssiduidade_txtDiaCorrente')
     if (currentDay !== null) {
+        currentDay.querySelectorAll(`.${SPAN_CLASS}`).forEach(span => currentDay.removeChild(span))
         let currentDayHoursStr = currentDay?.innerText?.split(' - ')
         if (currentDayHoursStr.length  === 0) return;
         if (currentDayHoursStr.length < 4) {
@@ -46,11 +55,13 @@ const worker = () => {
             if (isDate(date)) return date;
             return null;
         }).filter((date) => date !== null) as Date[];
-        const workingHours = calcWorkingMinutes(currentDayHours);
-        appendSpan(currentDay, workingHours);
+        const workingMinutes = calcWorkingMinutes(currentDayHours);
+        appendSpan({element: currentDay, minutes: workingMinutes});
     }
+    setTimeout(setCurrentDay, 1000*60)
+}
 
-
+const setPreviousDay = () => {
     const previousDay = document.getElementById('ctl00_ASPxSplitter_cphContent_painelMovimentosAssiduidade_WMovimentosAssiduidade_cpMovimentosAssiduidade_txtDiaAnterior')
     if (previousDay !== null) {
         const lastDayHours = previousDay?.innerText?.split(' - ')
@@ -60,11 +71,13 @@ const worker = () => {
             if (isDate(date)) return date;
             return null
         }).filter((date) => date !== null) as Date[];
-
-        const workingHours = calcWorkingMinutes(lastDayHoursParsed);
-        appendSpan(previousDay, workingHours);
+        const workingMinutes = calcWorkingMinutes(lastDayHoursParsed);
+        appendSpan( {element: previousDay, minutes: workingMinutes});
     }
+}
 
+const setResultsTable = () => {
+    if(document.querySelectorAll(`.${SPAN_CLASS}`).length > 0) return;
     const rows = document.querySelectorAll('[id*=ctl00_ASPxSplitter_cphContent_grid_DXDataRow]');
     if (rows.length > 0) {
         rows.forEach(row => {
@@ -82,12 +95,15 @@ const worker = () => {
             const workingMinutes = calcWorkingMinutes(dates);
             if (workingMinutes === 0) return;
             columns[11].innerHTML = '';
-            appendSpan(columns[11], workingMinutes)
+            appendSpan({element: columns[11] as HTMLElement, minutes: workingMinutes, showOutTime: false})
         })
     }
-    setTimeout(worker, 1000)
+    setTimeout(setResultsTable, 1000)
 }
 
-worker()
 
-export default worker;
+setPreviousDay();
+setCurrentDay();
+setResultsTable();
+
+export default {}
