@@ -25,7 +25,7 @@ const calcWorkingMinutes = (hoursArray: Date[]) => {
 }
 
 const appendSpan = ({element, minutes, showOutTime = true}: { element: HTMLElement, minutes: number, showOutTime?: boolean }) => {
-    if (isNaN(minutes)) return;
+    if (isNaN(minutes) || !element) return;
     const existingSpan = element.querySelector('.working-time');
     if (existingSpan !== null) element.removeChild(existingSpan);
     const span = document.createElement('span');
@@ -55,7 +55,7 @@ const getWorkingTime = (dayElement: HTMLElement): number => {
     if (dayElement === null) return 0;
 
     // Remove existing spans
-    dayElement.querySelectorAll(`.${SPAN_CLASS}`).forEach(span => dayElement.removeChild(span));
+    dayElement.querySelectorAll(`.${SPAN_CLASS}`)?.forEach(span => dayElement.removeChild(span));
 
     // Split current day hours string
     let currentDayHoursStr = dayElement.innerText.split(' | ');
@@ -66,7 +66,10 @@ const getWorkingTime = (dayElement: HTMLElement): number => {
         const date = parse(hour, 'HH:mm', new Date());
         if (isDate(date)) return date;
         return null;
-    }).filter((date) => date !== null);
+    })
+        .filter((date) => date !== null)
+        .sort((a, b) => a!.getTime() - b!.getTime());
+
 
     // Remove entries that are too close to each other
     currentDayHours = currentDayHours.filter((date, index) => {
@@ -100,12 +103,13 @@ const setResultsTable = () => {
             appendSpan({element: columns[11] as HTMLElement, minutes: workingMinutes, showOutTime: false})
         })
     }
-    setTimeout(setResultsTable, 1000)
+    setInterval(setResultsTable, 1000 * 5);
 }
 
 const setWorkingTime = () => {
     const currentDay = document.getElementById('ctl00_ASPxSplitter_cphContent_painelMovimentosAssiduidade_WMovimentosAssiduidade_cpMovimentosAssiduidade_txtDiaCorrente');
     const previousDay = document.getElementById('ctl00_ASPxSplitter_cphContent_painelMovimentosAssiduidade_WMovimentosAssiduidade_cpMovimentosAssiduidade_txtDiaAnterior');
+
 
     let currentDayWorkingTime = 0;
     let previousDayWorkingTime = 0;
@@ -120,11 +124,21 @@ const setWorkingTime = () => {
     appendSpan({element: currentDay as HTMLElement, minutes: currentDayWorkingTime});
     appendSpan({element: previousDay as HTMLElement, minutes: previousDayWorkingTime, showOutTime: false});
 
-    setTimeout(getWorkingTime, 1000 * 15);
+    setInterval(setWorkingTime, 1000 * 60);
 }
 
 
 setWorkingTime();
 setResultsTable();
+
+const registerButton = document.getElementById('ctl00_ASPxSplitter_cphContent_painelMarcacaoAssiduidade_wMarcacaoAssiduidade_cpMarcacaoAssiduidadeBase_btnRegistarAssiduidadeBase');
+if (registerButton) {
+    registerButton.addEventListener('click', () => {
+        setTimeout(() => {
+            setWorkingTime();
+            setResultsTable();
+        }, 1000)
+    })
+}
 
 export default {}
